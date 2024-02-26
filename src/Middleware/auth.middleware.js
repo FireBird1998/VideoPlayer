@@ -1,7 +1,7 @@
-import {ApiResponse} from "../utils/ApiResponse.js";
+
 import { ApiError } from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
-import { ArtistUser } from "../models/ArtistUser.models.js";
+import { User } from "../models/User.models.js";
 import jwt from "jsonwebtoken";
 
 export const verifyJWT = asyncHandler(async (req, res, next) => {
@@ -29,15 +29,15 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
     const decoded = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET);
 
     // Find the user by ID
-    const artistUser = await ArtistUser.findById(decoded._id);
+    const user = await User.findById(decoded._id);
 
     // If the user does not exist, return an error
-    if (!artistUser) {
+    if (!user) {
         throw new ApiError(401, "User not found !!");
     }
 
     // Set the user in the request object
-    req.user = artistUser.toJSON();
+    req.user = User.toJSON();
     next();
     } catch (error) {
         throw new ApiError(401, "Invalid Token !!");
