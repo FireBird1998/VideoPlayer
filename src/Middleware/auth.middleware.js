@@ -29,7 +29,7 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
     const decoded = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET);
 
     // Find the user by ID
-    const user = await User.findById(decoded._id);
+    const user = await User.findById(decoded?._id);
 
     // If the user does not exist, return an error
     if (!user) {

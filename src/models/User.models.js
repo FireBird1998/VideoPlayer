@@ -86,6 +86,10 @@ userSchema.methods.generateRefreshToken = function () {
     );
 };
 
+/**
+ * Converts the user object (this a mongoose type object and can't be converted dicectely so I am first converting it to js object) to a JSON representation, excluding sensitive information.
+ * @returns {Object} The user object without the password and refreshToken properties.
+ */
 userSchema.methods.toJSON = function () {
     const userObject = this.toObject();
     delete userObject.password;
