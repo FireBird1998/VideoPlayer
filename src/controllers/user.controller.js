@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/User.models.js";
 import uploadOnCloudinary from "../utils/cloudinary.js";
+import jwt from "jsonwebtoken";
 
 const generateAccessAndRefreshTokens = async (userId) => {
   //we are generating the access token and refresh token
@@ -199,4 +200,64 @@ const userLogout = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "User Logged Out Successfully."));
 });
 
-export { userRegister, userLogin, userLogout };
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  const { refreshToken } = req.cookies || req.body || req.query || req.headers;
+
+  if (!refreshToken) {
+    throw new ApiError(400, "Refresh Token is required !!");
+  }
+
+  let  decoded = null;
+  try {
+    decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+  } catch (error) {
+    throw new ApiError(401, "Invalid Refresh Token !! Not a valid JWT Token !!");
+  }
+
+  let user = null;
+  try {
+    user = await User.findById(decoded?._id);
+  } catch (error) {
+    throw new ApiError(500, "Database error: " + error.message);
+  }
+
+  if (!user) {
+    throw new ApiError(404, "User with id does not exist");
+  }
+
+  if (user?.refreshToken !== refreshToken) {
+    throw new ApiError(401, "Invalid Refresh Token !! Not a valid Refresh Token Or Might have been expired !!");
+  }
+
+  let tokens = null;
+  try {
+    tokens = await generateAccessAndRefreshTokens(user._id);
+  } catch (error) {
+    throw new ApiError(500, "Token generation error: " + error.message);
+  }
+
+  const { accessToken, refreshToken: newRefreshToken } = tokens;
+
+  const cookieOptions = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  res.cookie("refreshToken", newRefreshToken, cookieOptions);
+  res.cookie("accessToken", accessToken, cookieOptions);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        ...user.toJSON(),
+        accessToken,
+        refreshToken: newRefreshToken,
+      },
+      "AccessToken Generated Successfully and Refreshed."
+    )
+  );
+});
+
+
+export { userRegister, userLogin, userLogout, refreshAccessToken };

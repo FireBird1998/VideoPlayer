@@ -8,6 +8,7 @@ const app = express(); // Creating an instance of the Express application
 
 // Adding middleware
 
+//this middleware will allow the frontend to make requests to the backend
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN, // Setting the CORS origin to the value of the environment variable CORS_ORIGIN
@@ -15,18 +16,21 @@ app.use(
   })
 );
 
+//this middleware will parse the request body and attach it to the request object
 app.use(
   express.json({
     limit: "64kb", // Setting the maximum request body size to 16kb for JSON requests
   })
 );
 
+//this middleware will parse the URL-encoded request body and attach it to the request object
 app.use(
   express.urlencoded({
     extended: true, // Allowing the use of nested objects in URL-encoded requests
     limit: "64kb", // Setting the maximum request body size to 16kb for URL-encoded requests
   })
 );
+
 
 app.use(express.static("public")); // Serving static files from the "public" directory
 

@@ -16,6 +16,7 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
     try{
         // Get the access token from the cookies
     const accessToken = req.cookies?.accessToken || req.header("Authorization")?.split(" ")[1];
+    
 
     // If there is no access token, return an error
     if (!accessToken) {
@@ -27,18 +28,20 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
 
     // Verify the access token
     const decoded = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET);
+    
 
     // Find the user by ID
     const user = await User.findById(decoded?._id);
-
+    
     // If the user does not exist, return an error
     if (!user) {
         throw new ApiError(401, "User not found !!");
     }
-
+    // console.log(user);
     // Set the user in the request object
-    req.user = User.toJSON();
+    req.user = user.toJSON();
     next();
+
     } catch (error) {
         throw new ApiError(401, "Invalid Token !!");
     }
