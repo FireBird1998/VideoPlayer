@@ -39,6 +39,11 @@ userRouter.route("/login").post(processForm.none(),userLogin);
 
 //secure route
 userRouter.route("/logout").post(verifyJWT, userLogout);
+/**
+ * We are using the verifyJWT middleware to verify the access token. If the token is verified, we are calling the userLogout controller function to logout the user.
+ *  
+ * but below we are no using the verifyJWT middleware to verify the access token. Instead we are using the refreshAccessToken controller function to refresh the access token.
+ */
 userRouter.route("/refresh-token").post(refreshAccessToken);
 
 
