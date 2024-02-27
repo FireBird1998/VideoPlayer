@@ -2,7 +2,10 @@ import asyncHandler from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/User.models.js";
-import uploadOnCloudinary from "../utils/cloudinary.js";
+import {
+  uploadOnCloudinary,
+  deleteFromCloudinary,
+} from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
 
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -296,9 +299,9 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
-  return res.status(200).json(
-    new ApiResponse(200, req.user, "Current User Details.")
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, req.user, "Current User Details."));
 });
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
@@ -346,23 +349,28 @@ const updateUserAvatarImage = asyncHandler(async (req, res) => {
   const avatar = await uploadOnCloudinary(avatarLocalPath);
 
   if (!avatar) {
-    throw new ApiError(400, "Avatar file failed to upload !! this is coming from cloudinary.");
+    throw new ApiError(
+      400,
+      "Avatar file failed to upload !! this is coming from cloudinary."
+    );
   }
 
   let user = null;
   try {
-    user = await User.findByIdAndUpdate(
-      req.user?._id,
-      {
-        $set: {
-          avatar: avatar.url,
-        },
-      },
-      { new: true }
-    );
+    user = await User.findById(req.user?._id);
     if (!user) {
       throw new ApiError(404, "User with id does not exist");
     }
+
+    // Delete old avatar from Cloudinary
+    if (user.avatar) {
+      const oldAvatarPublicId = user.avatar.split("/").pop().split(".")[0];
+      await deleteFromCloudinary(oldAvatarPublicId);
+    }
+
+    // Update user with new avatar
+    user.avatar = avatar.url;
+    await user.save();
   } catch (error) {
     console.error(error);
     throw new ApiError(500, "Database error: " + error.message);
@@ -383,23 +391,32 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
   if (!coverImage) {
-    throw new ApiError(400, "Cover Image file failed to upload !! this is coming from cloudinary.");
+    throw new ApiError(
+      400,
+      "Cover Image file failed to upload !! this is coming from cloudinary."
+    );
   }
 
   let user = null;
   try {
-    user = await User.findByIdAndUpdate(
-      req.user?._id,
-      {
-        $set: {
-          coverImage: coverImage.url,
-        },
-      },
-      { new: true }
-    );
+    user = await User.findById(req.user?._id);
     if (!user) {
       throw new ApiError(404, "User with id does not exist");
     }
+
+    // Delete old cover image from Cloudinary
+    if (user.coverImage) {
+      const oldCoverImagePublicId = user.coverImage
+        .split("/")
+        .pop()
+        .split(".")[0];
+        
+      await deleteFromCloudinary(oldCoverImagePublicId);
+    }
+
+    // Update user with new cover image
+    user.coverImage = coverImage.url;
+    await user.save();
   } catch (error) {
     console.error(error);
     throw new ApiError(500, "Database error: " + error.message);
