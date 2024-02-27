@@ -7,6 +7,7 @@ import {
   deleteFromCloudinary,
 } from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const generateAccessAndRefreshTokens = async (userId) => {
   //we are generating the access token and refresh token
@@ -410,7 +411,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
         .split("/")
         .pop()
         .split(".")[0];
-        
+
       await deleteFromCloudinary(oldCoverImagePublicId);
     }
 
@@ -427,6 +428,140 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user.toJSON(), "Cover Image Updated."));
 });
 
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+
+  if (!username || username.trim() === "") {
+    throw new ApiError(400, "Username is required !!");
+  }
+
+  const channel = await User.aggregate([
+    {
+      $match: {
+        username: username?.toLowerCase(),
+      },
+    },
+    {
+      $lookup: {
+        from: "Subscription",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      $lookup: {
+        from: "Subscription",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribeTo",
+      },
+    },
+    {
+      $addFields: {
+        subscriberCount: { $size: "$subscribers" },
+        subscribeToCount: { $size: "$subscribeTo" },
+        isSubscribed: {
+          $in: [req.user?._id, "$subscribers.subscriber"],
+        },
+      },
+    },
+    {
+      $project: {
+        fullName: 1,
+        username: 1,
+        avatar: 1,
+        email: 1,
+        coverImage: 1,
+        subscriberCount: 1,
+        subscribeToCount: 1,
+        isSubscribed: 1,
+      },
+    },
+  ]);
+
+  console.log("Channel :- ", channel);
+
+  if (!channel || channel.length === 0) {
+    throw new ApiError(404, "Channel with username does not exist");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, channel[0], "Channel Profile."));
+
+});
+
+const getUserWatchHistory = asyncHandler(async (req, res) => {
+  const user = await User.aggregate([
+    {
+      $match: {
+        _id: req.user?._id,
+      },
+    },
+    {
+      $lookup: {
+        from: "Video",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            $lookup: {
+              from: "User",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    fullName: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              owner: { $arrayElemAt: ["$owner", 0] },
+            },
+          },
+          {
+            $project: {
+              title: 1,
+              description: 1,
+              videoFile: 1,
+              thumbnail: 1,
+              duration: 1,
+              views: 1,
+              isPublished: 1,
+              owner: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        watchHistory: 1,
+      },
+    },
+  ]);
+
+  if (!user || user.length === 0) {
+    throw new ApiError(404, "User with id does not exist");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user[0].watchHistory, "User Watch History."));
+
+});
+
+
 export {
   userRegister,
   userLogin,
@@ -437,4 +572,6 @@ export {
   updateAccountDetails,
   updateUserAvatarImage,
   updateUserCoverImage,
+  getUserChannelProfile,
+  getUserWatchHistory,
 };
