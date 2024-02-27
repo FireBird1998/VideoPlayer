@@ -191,7 +191,6 @@ const userLogout = asyncHandler(async (req, res) => {
     secure: true,
   };
 
-
   res.clearCookie("refreshToken", cookieOptions);
   res.clearCookie("accessToken", cookieOptions);
 
@@ -207,11 +206,14 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Refresh Token is required !!");
   }
 
-  let  decoded = null;
+  let decoded = null;
   try {
     decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
   } catch (error) {
-    throw new ApiError(401, "Invalid Refresh Token !! Not a valid JWT Token !!");
+    throw new ApiError(
+      401,
+      "Invalid Refresh Token !! Not a valid JWT Token !!"
+    );
   }
 
   let user = null;
@@ -226,7 +228,10 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 
   if (user?.refreshToken !== refreshToken) {
-    throw new ApiError(401, "Invalid Refresh Token !! Not a valid Refresh Token Or Might have been expired !!");
+    throw new ApiError(
+      401,
+      "Invalid Refresh Token !! Not a valid Refresh Token Or Might have been expired !!"
+    );
   }
 
   let tokens = null;
@@ -259,5 +264,160 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   );
 });
 
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
 
-export { userRegister, userLogin, userLogout, refreshAccessToken };
+  if (currentPassword === "" || currentPassword === undefined) {
+    throw new ApiError(400, "Current Password is required !!");
+  }
+
+  if (newPassword === "" || newPassword === undefined) {
+    throw new ApiError(400, "New Password is required !!");
+  }
+
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    throw new ApiError(404, "User with id does not exist");
+  }
+
+  const isPasswordCorrect = await user.isPasswordCorrect(currentPassword);
+
+  if (!isPasswordCorrect) {
+    throw new ApiError(401, "Current Password is incorrect");
+  }
+
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, null, "Password Changed Successfully."));
+});
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+  return res.status(200).json(
+    new ApiResponse(200, req.user, "Current User Details.")
+  );
+});
+
+const updateAccountDetails = asyncHandler(async (req, res) => {
+  const { fullName, email } = req.body;
+
+  if (fullName === "") {
+    throw new ApiError(400, "Full Name is required !!");
+  }
+  if (email === "") {
+    throw new ApiError(400, "Email is required !!");
+  }
+
+  let user = null;
+  try {
+    user = await User.findByIdAndUpdate(
+      req.user?._id,
+      {
+        $set: {
+          fullName,
+          email,
+        },
+      },
+      { new: true, runValidators: true }
+    );
+    if (!user) {
+      throw new ApiError(404, "User with id does not exist");
+    }
+  } catch (error) {
+    console.error(error);
+    throw new ApiError(500, "Database error: " + error.message);
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user.toJSON(), "Account Details Updated."));
+});
+
+const updateUserAvatarImage = asyncHandler(async (req, res) => {
+  const avatarLocalPath = req.file?.path;
+
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "Avatar file is required");
+  }
+
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+
+  if (!avatar) {
+    throw new ApiError(400, "Avatar file failed to upload !! this is coming from cloudinary.");
+  }
+
+  let user = null;
+  try {
+    user = await User.findByIdAndUpdate(
+      req.user?._id,
+      {
+        $set: {
+          avatar: avatar.url,
+        },
+      },
+      { new: true }
+    );
+    if (!user) {
+      throw new ApiError(404, "User with id does not exist");
+    }
+  } catch (error) {
+    console.error(error);
+    throw new ApiError(500, "Database error: " + error.message);
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user.toJSON(), "Avatar Updated."));
+});
+
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+  const coverImageLocalPath = req.file?.path;
+
+  if (!coverImageLocalPath) {
+    throw new ApiError(400, "Cover Image file is required");
+  }
+
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+
+  if (!coverImage) {
+    throw new ApiError(400, "Cover Image file failed to upload !! this is coming from cloudinary.");
+  }
+
+  let user = null;
+  try {
+    user = await User.findByIdAndUpdate(
+      req.user?._id,
+      {
+        $set: {
+          coverImage: coverImage.url,
+        },
+      },
+      { new: true }
+    );
+    if (!user) {
+      throw new ApiError(404, "User with id does not exist");
+    }
+  } catch (error) {
+    console.error(error);
+    throw new ApiError(500, "Database error: " + error.message);
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user.toJSON(), "Cover Image Updated."));
+});
+
+export {
+  userRegister,
+  userLogin,
+  userLogout,
+  refreshAccessToken,
+  changeCurrentPassword,
+  getCurrentUser,
+  updateAccountDetails,
+  updateUserAvatarImage,
+  updateUserCoverImage,
+};
